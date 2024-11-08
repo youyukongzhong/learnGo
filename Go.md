@@ -268,5 +268,510 @@ func main() {
 }
 ```
 
+例子:
+寻找最长不含有重复字符的子串  
+
+* abcabcbb → abc
+* bbbb → b
+* pwwkew → wke
+
+对于每一个字母X
+
+* lastOccurred[x]不存在，或者<start   →无需操作
+* lastOccurred[x] >= star  →更新start
+* 更新lastOccurred[x]，更新maxLength
+
+```go
+package main
+
+import "fmt"
+
+// 1. 函数定义
+func lengthOfNonRepeatingSubStr(s string) int {
+	// 2. 变量初始化
+	lastOccurred := make(map[byte]int)
+	start := 0
+	maxLength := 0
+
+	// 3. 遍历字符串
+	//将字符串 s 转换为 byte 切片后遍历，每个字符以 ch 表示，其索引为 i。
+	//之所以将 s 转换为 byte 切片，是因为代码仅处理 ASCII 字符。
+	//如果想支持 Unicode 字符，可以将 byte 换成 rune
+	for i, ch := range []byte(s) {
+		//4. 判断是否出现重复字符
+		if lastI, ok := lastOccurred[ch]; ok && lastI >= start {
+			start = lastI + 1
+		}
+		// 5. 更新最长子串长度
+		//i - start + 1 表示 start 到 i 之间的字符数
+		//这就是从 start 到 i 之间的字符总数。
+		if i-start+1 > maxLength {
+			maxLength = i - start + 1
+		}
+		// 6. 更新字符最近出现的位置
+		lastOccurred[ch] = i
+	}
+	// 7. 返回结果
+	return maxLength
+}
+func main() {
+	fmt.Println(lengthOfNonRepeatingSubStr("abcabcbb"))
+	fmt.Println(lengthOfNonRepeatingSubStr("bbbbbb"))
+	fmt.Println(lengthOfNonRepeatingSubStr("pwwkew"))
+	fmt.Println(lengthOfNonRepeatingSubStr(""))
+	fmt.Println(lengthOfNonRepeatingSubStr("b"))
+	fmt.Println(lengthOfNonRepeatingSubStr("abcdef"))
+	fmt.Println(lengthOfNonRepeatingSubStr("让我们说中文"))
+	fmt.Println(lengthOfNonRepeatingSubStr("一二三三二一"))
+}
+```
+
+解题思路:
+
+> ### 1. 题目思路：不重复子串的长度
+>
+> 题目要求找到**最长的不重复子串**的长度，也就是说，你需要遍历字符串中的每个字符，记录从当前位置开始到结束的、不包含重复字符的最长子串。每当发现字符重复，就从重复字符之后开始新的子串。
+>
+> ### 2. 解题的具体步骤
+>
+> 假设你有字符串 `"abcabcbb"`，按照步骤来看看如何处理：
+>
+> 1. **定义需要的变量**：
+>    - `lastOccurred`：记录每个字符上次出现的位置。
+>    - `start`：当前子串的起点。
+>    - `maxLength`：记录最大子串的长度。
+> 2. **遍历字符串**：
+>    - 遍历每个字符的索引 `i` 和字符本身 `ch`。
+>
+> ### 3. 逐步分析每个字符的操作
+>
+> 我们逐字符地分析 `"abcabcbb"`，假设 `start` 一开始是 `0`，`maxLength` 是 `0`。
+>
+> #### Step 1：遍历字符 `'a'`（索引 `0`）
+>
+> - `lastOccurred` 没有 `'a'`，说明当前子串没有重复字符。
+> - 更新 `maxLength` 为 `1`。
+> - 将 `'a'` 的索引 `0` 存入 `lastOccurred`：`{'a': 0}`。
+>
+> #### Step 2：遍历字符 `'b'`（索引 `1`）
+>
+> - `lastOccurred` 没有 `'b'`，继续扩展子串。
+> - 更新 `maxLength` 为 `2`。
+> - 将 `'b'` 的索引 `1` 存入 `lastOccurred`：`{'a': 0, 'b': 1}`。
+>
+> #### Step 3：遍历字符 `'c'`（索引 `2`）
+>
+> - `lastOccurred` 没有 `'c'`，继续扩展子串。
+> - 更新 `maxLength` 为 `3`。
+> - 将 `'c'` 的索引 `2` 存入 `lastOccurred`：`{'a': 0, 'b': 1, 'c': 2}`。
+>
+> #### Step 4：遍历字符 `'a'`（索引 `3`）
+>
+> - `lastOccurred` 有 `'a'`，且上次出现的位置是 `0`，这意味着我们遇到重复字符。
+> - 将 `start` 更新到 `lastOccurred['a'] + 1 = 1`，以跳过之前的重复字符。
+> - 更新 `'a'` 的索引为 `3`，现在 `lastOccurred = {'a': 3, 'b': 1, 'c': 2}`。
+>
+> #### Step 5：继续遍历其他字符
+>
+> 通过这个方式继续下去，每当遇到重复字符，就更新 `start` 跳过重复字符，计算新子串的长度并更新 `maxLength`。
+
+#### 字符和字符串处理
+
+rune相当于go的char
+
+> * 使用range 遍历pos, rune对
+> * 使用utf8.RuneCountInString获得字符数量
+> * 使用 len 获得字节长度
+> * 使用 [ ]byte 获得字节
+
+``````go
+package main
+
+import (
+	"fmt"
+	"unicode/utf8"
+)
+
+func main() {
+	s := "Yes我爱GO语言" // UTF-8编码
+	//fmt.Printf("%s\n", []byte(s))
+	//fmt.Println(s)
+	// 1. 将字符串 s 转换为字节切片,并输出每个字节的十六进制值。
+	// []byte(s) 将字符串 s 转换成字节数组,以便可以按原始字节数据读取。
+	//输出结果:596573e68891e788b1474fe8afade8a880
+	//英文字符 “Yes” 用 ASCII 编码，占一个字节。
+	//中文字符 “我爱GO语言” 用 UTF-8 编码，每个汉字占 3 字节。
+	fmt.Printf("%x\n", []byte(s))
+
+	// 2.逐个打印字符串的每个字节的十六进制值,逐个输出 s 转换成字节切片后每个字节的编码。
+	// 输出结果: 59 65 73 e6 88 91 e7 88 b1 47 4f e8 af ad e8 a8 80
+	for _, b := range []byte(s) {
+		fmt.Printf("%x ", b)
+	}
+	fmt.Println()
+
+	// 3.使用 for range 遍历字符串 s 中的每个字符
+	//输出中每个汉字字符用一个 rune 表示，英文字符依旧用一个字节表示。
+	// 输出结果: (0 59) (1 65) (2 73) (3 6211) (6 7231) (9 47) (10 4f) (11 8bed) (14 8a00)
+	// 进行了UTF-8的解码
+	for i, ch := range s { //ch is a rune
+		fmt.Printf("(%d %x) ", i, ch)
+	}
+	fmt.Println()
+
+	// 4.输出字符串 s 的 符文（rune）数量。中文字符被视作单个字符，即使其 UTF-8 编码占用多个字节。
+	//Rune count: 符文计数
+	fmt.Println("Rune count:", utf8.RuneCountInString(s))
+
+	// 5.通过 utf8.DecodeRune 解码字符串的字节数组（[]byte），这段代码会逐个读取字节，并将其转换成一个 rune(字符)。
+	// (utf8.DecodeRune：将"字节"解码为"字符")
+	// 每次解码得到一个字符 ch 和其占用的字节数 size，然后从 bytes 切片中跳过这些字节。最终输出每个字符 ch，与原始字符串内容一致。
+	bytes := []byte(s) //先将s转为字节,因为DecodeRune方法接受的是byte类型
+	for len(bytes) > 0 {
+		//func DecodeRune(p []byte) (r rune, size int)
+		ch, size := utf8.DecodeRune(bytes)
+		bytes = bytes[size:]
+		fmt.Printf("%c ", ch)
+	}
+	fmt.Println()
+
+	// 6.这里将 s 转换成 rune 切片，然后遍历每个字符（以 rune 表示）。
+	// []rune(s)：将字符串转换为 rune 数组，遍历时每个字符都会按 Unicode 编码处理。
+	// 这样可以确保遍历时每个字符都被正确处理，即中文字符也只会被视为一个字符。
+	for i, ch := range []rune(s) {
+		fmt.Printf("(%d %c)", i, ch)
+	}
+	fmt.Println()
+
+	//strings包里有其它关于string的操作
+}
+``````
+
+string的其他操作
+
+> * Fields, Split, Join
+> * Contains, Index
+> * ToLower, ToUpper
+> * Trim, TrimRight, TrimLeft
+
+### 面向"对象"
+
+#### 结构体和方法
+
+> * go语言仅支持封装，不支持继承和多态
+> * go语言没有class,只有struct
+
+结构的创建:
+
+``````go
+// 工厂函数 
+func createTreeNode(value int) *TreeNode {
+    return &TreeNode{Value: value}
+}
+root.Left.Right = createTreeNode(2)
+``````
+
+> * 使用自定义工厂函数
+> * 注意返回了局部变量的地址!
+
+使用工厂函数有几个优势：
+
+> * **封装**：可以在工厂函数中添加初始化逻辑，集中管理 `treeNode` 的创建过程。
+> * **可维护性**：若以后 `treeNode` 创建方式改变（比如需要添加日志），只需改动工厂函数即可，无需修改所有 `treeNode` 初始化的位置。
+
+值接收者 vs 指针接收者
+
+> * 要改变内容必须使用指针接收者
+>
+> * 结构过大也考虑使用指针接收者
+>
+> * 一致性：如有指针接收者，最好都是指针接收者
+>
+>   
+>
+> * 值接收者 是go语言特有
+>
+> * 值/指针接收者可接收值/指针
+
+举例:
+
+```go
+项目根目录/
+└── tree/
+    └── entry
+        └───entry.go
+    └── node.go
+    └── traversal.go
+```
+
+``````go
+entry.go
+
+package main
+
+import (
+	"fmt"
+	"learngo_muke/tree"
+)
+
+// 自定义结构体 myTreeNode 的后序遍历（PostOrder Traversal）功能
+type myTreeNode struct {
+	node *tree.Node
+}
+
+// postOrder 后序遍历
+// 后序遍历：一种树形数据结构的遍历方式。
+// 后序遍历的顺序是：左子树 -> 右子树 -> 当前节点。
+func (myNode *myTreeNode) postOrder() {
+	//首先检查当前 myNode 是否为 nil，以及其内部的 node 是否为 nil，如果是，就直接返回，防止空指针错误
+	if myNode.node == nil || myNode.node == nil {
+		return
+	}
+
+	left := myTreeNode{myNode.node.Left}
+	right := myTreeNode{myNode.node.Right}
+
+	left.postOrder()
+	right.postOrder()
+	myNode.node.Print()
+}
+
+func main() {
+	// 声明一个 treeNode 变量 root。此时 root 是一个 treeNode 类型的实例，初始值为零值。
+	var root tree.Node
+
+	root = tree.Node{Value: 3}           // 初始化 root 节点的值为 3
+	root.Left = &tree.Node{}             // 设置 root 节点的左子节点为一个新的空 treeNode 节点
+	root.Right = &tree.Node{5, nil, nil} // 设置 root 节点的右子节点为值为 5 的新节点，左右子节点为 nil
+	root.Right.Left = new(tree.Node)     // 设置 root 的右子节点的左子节点为一个新创建的 treeNode 节点，默认零值
+	root.Left.Right = tree.CreateNode(2) // 使用工厂函数 createNode 创建一个值为 2 的新节点，作为 root 的左子节点的右子节点
+
+	// 设置 root 的右子节点的左子节点的值为 4，并调用其 Print 方法输出值
+	root.Right.Left.SetValue(4)
+	root.Right.Left.Print()
+	fmt.Println()
+
+	// 调用 root 的 Print 方法。由于 Print 方法不改变节点值，因此值不会影响 root
+	root.Print() // 输出：3
+	fmt.Println()
+
+	// 调用 root 的 SetValue 方法，将 root 节点的值设置为 100
+	// SetValue 方法接受指针，所以 root 本身的值会被更改。
+	root.SetValue(100)
+
+	// 声明一个 treeNode 指针变量 pRoot
+	var pRoot *tree.Node
+	// 调用 pRoot 的 SetValue 方法。pRoot 目前为 nil，因此调用 SetValue 时会检测到 node == nil，
+	// 输出 "setting value to nil node. Ignored" 并返回，不会导致崩溃
+	pRoot.SetValue(200)
+	// 将 pRoot 设置为指向 root 节点的地址
+	pRoot = &root
+
+	// 调用 pRoot 的 SetValue 方法，将 root 节点的值设置为 300
+	// 因为 pRoot 指向 root，所以 root 的值会更改。
+	pRoot.SetValue(300)
+	// 调用 pRoot 的 Print 方法打印 root 节点的值。
+	// 结果输出 300。
+	pRoot.Print()
+
+	root.Traverse()
+
+	fmt.Println()
+	myRoot := myTreeNode{&root}
+	myRoot.postOrder()
+	fmt.Println()
+}
+``````
+
+```go
+node.go
+
+package tree
+
+import "fmt"
+
+// treeNode结构体定义二叉树的节点结构，包含value字段存储节点值，
+// left和right字段分别指向左右子节点
+type Node struct {
+	Value       int
+	Left, Right *Node
+}
+
+// 普通方法 Print()
+// 接收者类型：(node treeNode) 指定了接收者类型 treeNode，这意味着 Print() 方法会针对 treeNode 值的副本执行，而不会修改原始值。
+// 调用方式：可以通过 treeNode 实例来调用，例如 node.Print()()。
+// 作用：Print() 方法只是输出节点的 value，不涉及修改。
+// 注意点：这里 node 是 treeNode 值的副本，如果 Print() 方法中修改了 node 的值，原 treeNode 不受影响。
+func (node Node) Print() {
+	fmt.Print(node.Value, " ")
+}
+
+// 指针接收者方法 setValue
+// 接收者类型：(node *treeNode) 表明接收者是指向 treeNode 的指针。
+// 调用方式：setValue 可以通过 treeNode 的值或指针调用，Go 会自动处理这种转换，例如 node.setValue(5) 或 &node.setValue(5)。
+// 作用：setValue 方法可以修改原 treeNode 实例的值，因为它是通过指针访问的。
+// 应用场景：当方法需要修改接收者的值时，指针接收者是必选项，否则只会修改副本。
+// 另外在该函数中，如果 node == nil，表示当前指针为空指针，无法赋值，因此直接返回提示。
+func (node *Node) SetValue(value int) {
+	if node == nil {
+		fmt.Println("setting value to nil node.Ignored")
+		return
+	}
+	node.Value = value
+}
+
+// 工厂函数 CreateNode
+// 结构：CreateNode 是一个工厂函数，它不属于 treeNode 类型，因此没有接收者。
+// 返回值：返回一个 *treeNode 类型的指针。
+// 作用：封装 treeNode 的初始化逻辑，创建一个新的 treeNode 实例，并返回其地址。
+// 优势：便于集中管理 treeNode 的初始化过程，如后续需为新节点附加一些初始操作，可以直接在此函数中完成。
+func CreateNode(value int) *Node {
+	return &Node{Value: value}
+}
+```
+
+```go
+reaversal.go
+
+package tree
+
+// 中序遍历
+// 先访问左子树，再访问当前节点，最后访问右子树。
+func (node *Node) Traverse() {
+	if node == nil {
+		return
+	}
+	node.Left.Traverse()
+	node.Print()
+	node.Right.Traverse()
+}
+```
+
+
+
+#### 包 和 封装
+
+封装
+
+> * 名字一般使用CamelCase (驼峰命名法)单词首字母命名法
+> * 首字母大写: public
+> * 首字母小写: private
+
+包
+
+> * 每个目录一个包
+> * main包包含可执行入口
+> * 为结构定义的方法必须放在同一个包内
+> * 可以是不同的文件
+
+#### 扩展已有类型
+
+包
+
+如何扩充系统类型或者别人的类型
+
+> * 定义别名的方式
+> * 使用组合的方式
+> * 使用内嵌的方式 (Embedding)
+
+举例:
+
+``````go
+项目根目录/
+└── queue/
+    └── entry
+        └───main.go
+    └── queue.go
+``````
+
+queue.go
+
+``````go
+package queue
+
+type Queue []int
+
+// Push 推送方法
+func (q *Queue) Push(v int) {
+	*q = append(*q, v)
+}
+
+// Pop 弹出方法
+func (q *Queue) Pop() int {
+	head := (*q)[0]
+	*q = (*q)[1:]
+	return head
+}
+
+// IsEmpty 如果slice为空的情况
+func (q *Queue) IsEmpty() bool {
+	return len(*q) == 0
+}
+``````
+
+main.go
+
+```go
+package main
+
+import (
+	"fmt"
+	"learngo_muke/queue"
+)
+
+func main() {
+	q := queue.Queue{1}
+
+	q.Push(2)
+	q.Push(3)
+	fmt.Println(q.Pop())
+	fmt.Println(q.Pop())
+	fmt.Println(q.IsEmpty())
+	fmt.Println(q.Pop())
+	fmt.Println(q.IsEmpty())
+}
+
+//输出结果为
+// 1
+// 2
+// false
+// 3
+// true
+```
+
+#### 使用内嵌来扩展已有类型
+
+> * Embedding
+
+```go
+//Embedding 内嵌
+// 可以把node字段名省略掉,实际上是go语言的语法糖
+type myTreeNode struct {
+	//node *tree.Node
+    *tree.Node
+}
+```
+
+### Go语言的依赖管理
+
+#### 依赖管理
+
+> * 依赖的概念
+> * 依赖管理的三个阶段 GOPATH , GOVENDOR , GO MOD
+
+GO MOD
+
+> * 由go 命令统一管理, 用户不必关心目录结构
+> * 初始化: go mod init
+> * 增加依赖: go get
+> * 更新依赖: go get [@v...],go mod tidy 
+> * 将旧项目迁移到go mod: go mod init, go build ./...
+
+```go
+go mod init 项目名/随意
+go build ./...
+go get [@v...] , go mod tidy 
+```
+
 
 
