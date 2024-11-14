@@ -769,9 +769,165 @@ GO MOD
 
 ```go
 go mod init 项目名/随意
-go build ./...
+go build ./... 当前目录以及所有子目录下的go文件都要build出来(编译完成后并不会产生结果)
+go install ./...  
 go get [@v...] , go mod tidy 
 ```
 
 
 
+## 编程思想
+
+### 面向接口
+
+#### 接口的概念
+
+##### 接口
+
+```go
+type Traversal interface {
+    Traverse()
+}
+
+func main() {
+    traversal := getTraversal()
+    traversal.Traverse()
+}
+```
+
+##### 接口的概念
+
+> * 强类型语言:熟悉接口的概念 (go语言是一种强类型系统)
+> * 弱类型语言:没(少)有接口的概念
+> * 接口的详解:使用Google Guice实现依赖注入(慕课课程)
+
+> * 小孩才分对错
+> * 大人只看利弊
+
+##### duck typing
+
+> * "像鸭子走路,像鸭子叫(长得像鸭子),那么就是鸭子"
+> * 描述事物的外部行为而非内部结构
+> * 严格说go属于结构化类型系统,类似duck typing
+
+查看接口变量
+
+> * 表示任何类型: interface{}
+> * Type Assertion
+> * Type Switch
+
+接口的组合
+
+```go
+type ReadWriter interface {
+    Reader
+    Writer
+}
+```
+
+特殊接口
+
+> * stringer
+> * Reader / Writer
+
+#### 函数式编程
+
+##### 函数与闭包
+
+函数式编程 vs 函数指针
+
+> * 函数是一等公民:参数，变量，返回值都可以是函数
+> * 高阶函数
+> * 函数 → 闭包
+
+"正统" 函数式编程
+
+> * 不可变形:不能有状态,只有常量和函数
+> * 函数只能有一个参数
+> * 不作上述严格规定
+
+go语言闭包的应用
+
+例一:斐波那契数列
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"io"
+	"strings"
+)
+
+// 斐波那契数列
+// 1, 1, 2, 3, 5, 8, 13, ...
+//
+//	a, b
+//	   a, b
+//
+// fibonacci 函数返回一个生成斐波那契数列的生成器
+// 通过闭包形式，每次调用生成下一个斐波那契数
+func fibonacci() intGen {
+	a, b := 0, 1
+	return func() int {
+		a, b = b, a+b
+		return a
+	}
+}
+
+// intGen 是一个函数类型，返回一个整数
+type intGen func() int
+
+// Read 实现了 io.Reader 接口
+// 它将斐波那契数转换为字符串形式，并写入到提供的字节切片 p 中
+func (g intGen) Read(p []byte) (n int, err error) {
+	// 获取下一个斐波那契数
+	next := g()
+	if next > 10000 {
+		// 如果超过 10000，则返回 EOF 表示数据结束
+		return 0, io.EOF
+	}
+
+	// 将斐波那契数转换为字符串形式，并附加换行符
+	s := fmt.Sprintf("%d\n", next)
+
+	// 将字符串写入到字节切片 p 中
+	// TODO: incorrect if p is too small!
+	return strings.NewReader(s).Read(p)
+}
+
+// printFileContents 可以逐行打印文件内容的函数
+// 处理任何支持“逐行读取”的数据源，比如文件、字符串、甚至网络数据。
+func printFileContents(reader io.Reader) {
+	// NewScanner  扫描器（Scanner），可以逐行读取数据
+	scanner := bufio.NewScanner(reader)
+
+	//一个循环，逐行读取 reader 中的内容，并打印出来。
+	for scanner.Scan() {
+		fmt.Println(scanner.Text())
+	}
+}
+
+func main() {
+	// 创建一个斐波那契数列生成器
+	f := fibonacci()
+
+	// 打印斐波那契数列内容
+	printFileContents(f)
+}
+```
+
+#### 错误处理和资源管理
+
+##### defer调用
+
+> * 确保调用在函数结束时发生
+> * 参数在defer语句时计算
+> * defer列表为先进后出
+
+何时使用defer调用
+
+> * Open/Close
+> * Lock/Unlock
+> * PrintHeader/PrintFooter 网页的头尾
