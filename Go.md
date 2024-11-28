@@ -830,7 +830,7 @@ type ReadWriter interface {
 > * stringer
 > * Reader / Writer
 
-#### 函数式编程
+### 函数式编程
 
 ##### 函数与闭包
 
@@ -918,7 +918,7 @@ func main() {
 }
 ```
 
-#### 错误处理和资源管理
+### 错误处理和资源管理
 
 ##### defer调用
 
@@ -934,3 +934,440 @@ func main() {
 
 ##### 错误处理概念
 
+##### 服务器统一出错处理1
+
+##### 服务器统一出错处理2
+
+error vs panic
+
+> * 意料之中的 :使用error。 如:文件打不开
+> * 意料之外的: 使用panic。 如: 数组越界
+
+错误处理综合示例
+
+> * defer + panic + recover  
+> * Type Assertion  来处理错误
+> * 函数式编成的应用 (errWrapper)
+
+### 测试与性能调优
+
+#### 测试
+
+<img src= "image-4.png" alt="测试与性能调优" style="zoom:50%;">
+
+传统测试 VS 表格驱动测试
+
+传统测试:
+
+<img src= "image-5.png" alt="测试与性能调优" style="zoom:50%;">
+
+> * 测试数据和测试逻辑混在一起
+> * 出错信息不明确
+> * 一旦一个数据出错测试全部结束
+
+表格驱动测试:
+
+<img src= "image-6.png" alt="测试与性能调优" style="zoom:50%;">
+
+> * 分离的测试数据和测试逻辑
+> * 明确的出错信息
+> * 可以部分失败
+> * 
+> * go语言的语法使得我们更易实践表格驱动测试
+
+#### 代码覆盖率和性能测试
+
+代码覆盖率:
+
+> * go test --coverprofile=c.out
+> *  go tool cover 查看代码覆盖率工具使用说明
+> * go tool cover -html="c.out" // 在html页面查看(注意windows下c.out要加引号)
+
+性能测试:
+
+> * go test -bench .
+
+#### 使用pprof进行性能调优
+
+性能调优
+
+<img src= "image-7.png" alt="性能调优" style="zoom:50%;">
+
+> * 性能测试命令：   go test  -banch . -cpuprofile cpu.out
+> * 查看  go tool pprof cpu.out   (pprof) 
+> *  web优化思路：用空间换时间
+
+#### 测试http服务器
+
+> * 通过使用假的Request/Response
+> * 通过起服务器
+
+#### 生成文档和示例代码
+
+文档
+
+> * 用注释写文档
+> * 在测试中 加入 Example
+> * 使用 go doc / godoc 来查看/生成文档
+
+#### 测试总结
+
+> * 表格驱动测试
+> * 代码覆盖
+> * 性能优化工具
+> * http测试
+> * 文档以及示例代码
+
+### Goroutine
+
+#### goroutine
+
+<img src= "image-8.png" alt="Goroutine" style="zoom:50%;">
+
+协程 Coroutine
+
+> * 轻量级 "线程"
+> * 非抢占式多任务处理,由协程主动交出控制权
+> * 编译器/解释器/虚拟机层面的多任务
+> * 多个协程可能在一个或者多个线程上运行
+
+<img src= "image-9.png" alt="Goroutine" style="zoom:50%;">
+
+Goroutine
+
+<img src= "image-10.png" alt="Goroutine" style="zoom:50%;">
+
+Goroutine的定义
+
+> * 任何函数只需加上go就能送给调度器运行
+> * 不需要在定义时区分是否是异步函数
+> * 调度器在合适的点进行切换
+> * 使用 -race来检测数据访问冲突
+
+Goroutine可能的切换点
+
+> * I/O , select
+> * channel
+> * 等待锁
+> * 函数调用(有时)
+> * runtime.Gosched()
+> * 只是参考,不能保证切换,不能保证在其他地方不切换
+
+### Channel
+
+#### 什么是channel?
+
+**Channel** 是Go 语言中用于协程（Goroutine）之间通信的核心机制，可以在多个协程间 **安全地传递数据**。它类似于一个线程安全的队列，通过发送（`send`）和接收（`receive`）操作实现数据流动。
+
+##### Channel的特点
+
+1.  **类型安全**: Channel 中传递的数据必须是同一种类型。
+2. **同步阻塞**: 
+   - 发送操作会阻塞，直到另一个协程接收到数据。  
+   - 接收操作会阻塞，直到有协程发送了数据。
+3. **无锁机制**：Go 的 Channel 通过设计避免了使用复杂的锁机制，使代码更简单高效。
+
+##### 如何使用Channel?
+
+###### 1. 创建 Channel
+
+使用 'make' 函数创建 Channel:
+
+```go
+ch := make(chan int) // 创建一个传递int类型数据的无缓冲Channel
+```
+
+###### 2.发送和接收数据
+
+通过 ```<-``` 操作符发送和接收数据
+
+```go
+ch <- 10 // 发送数据到Channel
+value := <-ch // 从Channel接受数据
+```
+
+例子:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    ch := make(chan int) // 创建一个整数通道
+
+    // 启动一个协程发送数据
+    go func() {
+        fmt.Println("Sending value: 42")
+        ch <- 42 // 向通道发送数据
+    }()
+
+    // 从通道接收数据
+    value := <-ch
+    fmt.Println("Received value:", value)
+}
+```
+
+输出:
+
+```yaml
+Sending value: 42
+Received value: 42
+```
+
+阻塞行为:
+
+> * **发送**：如果没有接收者，`ch <- value` 会阻塞。
+> * **接收**：如果通道里没有数据，`value := <-ch` 会阻塞，直到有数据可以接收。
+
+###### 3.带缓冲的 Channel
+
+带缓冲的 channel 不会立即阻塞发送操作,直到缓冲区满为止:
+
+```go
+ch := make(chan int , 3) //创建一个缓冲区大小为 3 的Channel
+```
+
+##### Channel 的常见应用场景
+
+1. 协程之间的数据共享
+
+   协程可以通过 Channel 传递数据，避免竞争条件。
+
+   * **例子**：多个协程爬取网页数据，通过 Channel 将结果发送给主协程，主协程统一处理。
+
+2. 实现任务队列
+
+   使用缓冲 Channel 作为任务队列，将任务分配给多个协程处理。
+
+   - **例子**：电商平台处理用户订单时，任务按照**先后顺序**放入队列，每个协程从队列中读取任务并处理。
+
+3. 协程同步与通知
+
+   Channel 可以用来协调多个协程的执行顺序或通知协程完成某些任务。
+
+   - **例子**：一个协程负责下载文件，另一个协程等待文件下载完成后进行解析。
+
+4. 超时控制
+
+   配合 `select` 语句和 `time.After` 函数实现超时机制。
+
+   - **例子**：用户请求需要调用外部 API，但超过3秒未响应就自动超时。
+
+5. 实现工作池(Worker Pool)
+
+   通过 Channel 分发任务到多个协程中，让协程并行执行任务。
+
+   - **例子**：处理图片压缩任务时，主协程将路径发送到 Channel，每个协程读取路径后完成压缩。
+
+举例:
+
+演示了:
+
+> * channel
+> *  buffered channel
+> * range
+> * 理论基础 : Conmmunication Sequential Process(CSP模型)GO语言的并发是基于CSP模型做出来的
+
+```go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+// worker :用于从 Channel 中接收数据并处理
+func worker(id int, c chan int) {
+	//遍历 Channel，直到 Channel 被关闭。
+	//每次接收一个数据 n，输出到控制台。
+	//range 的作用：优雅地处理 Channel 的关闭，当 Channel 关闭后，循环会自动退出。
+	for n := range c {
+		//n, ok := <-c
+		//if !ok {
+		//	break
+		//}
+		fmt.Printf("Worker %d received %c\n", id, n)
+	}
+}
+
+// createWorker :这是一个工厂函数，用于创建每个 worker，并返回用于发送数据的 Channel。
+// chan<- int ：表示返回的 Channel 只能用于发送数据，限制了 Channel 的使用方向，增加了代码的安全性。
+func createWorker(id int) chan<- int {
+	c := make(chan int) //创建一个无缓冲 Channel。
+	go worker(id, c)    //启动 Goroutine，运行 worker 函数，让它监听传入的 Channel。
+	return c
+}
+
+// chanDemo :演示了如何使用多个 Channel 与多个 Goroutine 通信。
+func chanDemo() {
+	// 创建了一个 channels 数组，用于存储 10 个发送 Channel。
+	var channels [10]chan<- int
+	for i := 0; i < 10; i++ {
+		// 每个 Channel 对应一个 Worker Goroutine。
+		channels[i] = createWorker(i)
+	}
+
+	for i := 0; i < 10; i++ {
+		channels[i] <- 'a' + i
+	}
+
+	//for i := 0; i < 10; i++ {
+	//	channels[i] <- 'A' + i
+	//}
+
+	time.Sleep(time.Millisecond)
+}
+
+// bufferedChannel 演示了带缓冲的 Channel。
+func bufferedChannel() {
+	c := make(chan int, 3) //创建一个缓冲区大小为 3 的 Channel。
+	go worker(0, c)        // 启动一个 worker goroutine 来接收数据并处理
+
+	// 依次发送 4 个数据
+	c <- 'a'
+	c <- 'b'
+	c <- 'c'
+	c <- 'd' // 这一行会阻塞，直到有接收者消费数据
+	time.Sleep(time.Millisecond)
+}
+
+func channelClose() {
+	c := make(chan int)
+	go worker(0, c)
+	c <- 'a'
+	c <- 'b'
+	c <- 'c'
+	c <- 'd'
+
+	// 关闭 channel
+	close(c)
+
+	// 向已关闭的 channel 发送数据
+	// 使用 select 来避免 panic
+	//go func() {
+	//	select {
+	//	case c <- 'e':
+	//	default:
+	//		fmt.Println("channel is close, cannot send data.")
+	//	}
+	//}()
+
+	// 使用 defer(推迟) 和 recover 来捕获 panic
+	// recover 必须在 defer 语句中使用，且只能在发生 panic 后的 defer 中被调用。
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered from panic:", r)
+		}
+	}()
+
+	c <- 'e'
+
+	time.Sleep(time.Millisecond)
+}
+
+func main() {
+	fmt.Println("channel as first-class citizen")
+	//chanDemo()
+	fmt.Println("Buffered channel")
+	//bufferedChannel()
+	fmt.Println("Channel close and range")
+	channelClose()
+}
+```
+
+
+
+#### 使用Channel等待任务结束
+
+##### channel 实际应用
+
+> * Don't communicate by sharing memory; sharememory by communicating.不要通过共享内存来通信;通过通信来共享内存
+
+**通俗易懂的解释**：
+
+1. **共享内存**（Shared Memory）：指的是不同线程或进程可以直接读写相同的内存区域。每个线程或进程都有访问共享内存的权限。**问题**：这种方式容易引发 **竞争条件（race condition）**，即多个线程同时访问和修改同一块内存时，可能导致数据不一致或者程序崩溃。
+   - 举个例子：你和朋友共享一个笔记本（内存），你们可以同时写上东西。但是，如果你们在写的时候没有沟通清楚，可能会写到相同的位置，搞得很乱，甚至会擦掉彼此的内容。
+2. **消息传递**（Message Passing）：这是一种更安全的通信方式，其中线程或进程通过发送消息来交换数据，而不是直接读写共享内存。每个线程/进程都拥有自己的数据，并通过发送和接收消息来进行交流。这样，不同线程就不会直接访问同一块内存，从而避免了竞争条件的问题。
+   - 还是以笔记本为例，你和朋友各自有自己的笔记本（线程独立的内存），当你想告诉他某个信息时，你把信息写到一个信封（消息），然后把信封递给他。他可以从信封里取出信息并根据自己的需要使用，而你不需要直接去改动他手上的笔记本内容。
+
+例一 : 使用Channel来等待goroutine结束
+
+> * 一个一个的等
+> * 一批20个一起等
+> * **以及 WaitGroup的使用** (还没搞明白)
+
+```go
+package main
+
+import (
+	"fmt"
+)
+
+// worker :用于从 Channel 中接收数据并处理
+func doWork(id int, c chan int, done chan bool) {
+	for n := range c {
+		fmt.Printf("Worker %d received %c\n", id, n)
+		//go func() { done <- true }()
+		done <- true
+	}
+}
+
+type worker struct {
+	in   chan int
+	done chan bool
+}
+
+// createWorker :这是一个工厂函数，用于创建每个 worker，并返回用于发送数据的 Channel。
+func createWorker(id int) worker {
+	w := worker{
+		in:   make(chan int),
+		done: make(chan bool),
+	}
+	go doWork(id, w.in, w.done) //启动 Goroutine，运行 worker 函数，让它监听传入的 Channel。
+	return w
+}
+
+// chanDemo :演示了如何使用多个 Channel 与多个 Goroutine 通信。
+func chanDemo() {
+	// 创建了一个 channels 数组，用于存储 10 个发送 Channel。
+	var workers [10]worker
+	for i := 0; i < 10; i++ {
+		// 每个 Channel 对应一个 Worker Goroutine。
+		workers[i] = createWorker(i)
+	}
+
+	for i, worker := range workers {
+		worker.in <- 'a' + i
+	}
+
+	// wait for all of them
+	//for _, worker := range workers {
+	//	<-worker.done
+	//}
+
+	for i, worker := range workers {
+		worker.in <- 'A' + i
+	}
+
+	// wait for all of them
+	//for _, worker := range workers {
+	//	<-worker.done
+	//}
+
+	//time.Sleep(time.Millisecond)
+}
+
+func main() {
+	fmt.Println("channel as first-class citizen")
+	chanDemo()
+}
+```
+
+#### 使用Channel进行树的遍历 
+
+#### 使用Select来进行调度
+
+> * Select 的使用
+> * 定时器的使用
+> * 在Select中使用 nil Channel

@@ -4,9 +4,25 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 )
 
+const prefix = "/list/"
+
+type userError string
+
+func (e userError) Error() string {
+	return string(e)
+}
+
+func (e userError) Message() string {
+	return string(e)
+}
+
 func HandleFileList(w http.ResponseWriter, req *http.Request) error {
+	if strings.Index(req.URL.Path, prefix) != 0 {
+		return userError("path must start" + "with" + prefix)
+	}
 	path := req.URL.Path[len("/list/"):] // 提取请求路径中的文件路径
 	file, err := os.Open(path)           // 尝试打开文件
 	if err != nil {

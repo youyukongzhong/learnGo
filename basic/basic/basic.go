@@ -44,12 +44,16 @@ func euler() {
 		cmplx.Exp(1i*math.Pi)+1)
 }
 
-func tryiangle() {
+func triangle() {
 	var a, b int = 3, 4
+	fmt.Println(calcTriangle(a, b))
+}
+
+func calcTriangle(a, b int) int {
 	var c int
 	//math.Sqrt:返回根号x
 	c = int(math.Sqrt(float64(a*a + b*b)))
-	fmt.Println(c)
+	return c
 }
 
 // 常量的定义
@@ -94,7 +98,7 @@ func main() {
 	fmt.Println(aa, ss, bb)
 
 	euler()
-	tryiangle()
+	triangle()
 	consts()
 	enums()
 }

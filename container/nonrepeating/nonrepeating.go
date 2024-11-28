@@ -2,10 +2,19 @@ package main
 
 import "fmt"
 
+var lastOccurred = make([]int, 0xffff) //65535
+
 // 1. 函数定义
 func lengthOfNonRepeatingSubStr(s string) int {
 	// 2. 变量初始化
-	lastOccurred := make(map[rune]int)
+	//lastOccurred := make(map[rune]int)
+
+	for i := range lastOccurred {
+		lastOccurred[i] = -1
+	}
+	//lastOccurred[0x65] = 1
+	//lastOccurred[0x8BFE] = 6
+
 	start := 0
 	maxLength := 0
 
@@ -15,7 +24,7 @@ func lengthOfNonRepeatingSubStr(s string) int {
 	//如果想支持 Unicode 字符，可以将 byte 换成 rune
 	for i, ch := range []rune(s) {
 		//4. 判断是否出现重复字符
-		if lastI, ok := lastOccurred[ch]; ok && lastI >= start {
+		if lastI := lastOccurred[ch]; lastI != -1 && lastI >= start {
 			start = lastI + 1
 		}
 		// 5. 更新最长子串长度
