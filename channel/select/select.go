@@ -24,11 +24,12 @@ func worker(id int, c chan int) {
 	//每次接收一个数据 n，输出到控制台。
 	//range 的作用：优雅地处理 Channel 的关闭，当 Channel 关闭后，循环会自动退出。
 	for n := range c {
+		time.Sleep(5 * time.Second)
 		//n, ok := <-c
 		//if !ok {
 		//	break
 		//}
-		fmt.Printf("Worker %d received %c\n", id, n)
+		fmt.Printf("Worker %d received %d\n", id, n)
 	}
 }
 
@@ -40,13 +41,26 @@ func createWorker(id int) chan<- int {
 
 func main() {
 	var c1, c2 = generator(), generator()
-	w := createWorker(0)
+	var worker = createWorker(0)
+
+	//把生成的数据存起来
+	var values []int
+	n := 0
 	for {
+		var activeWorker chan<- int
+		var activeValue int
+		if len(values) > 0 {
+			activeWorker = worker
+			activeValue = values[0]
+		}
 		select {
-		case n := <-c1:
-			fmt.Println("Received from c1:", n)
-		case n := <-c2:
-			fmt.Println("Received from c2:", n)
+		case n = <-c1:
+			values = append(values, n)
+		case n = <-c2:
+			values = append(values, n)
+		case activeWorker <- activeValue:
+			values = values[1:] //送完值后,把values中的第一个值拿掉
+
 			//default:
 			//	fmt.Println("No value received")
 		}
