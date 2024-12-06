@@ -1366,8 +1366,655 @@ func main() {
 
 #### 使用Channel进行树的遍历 
 
-#### 使用Select来进行调度
+#### Select
+
+##### 使用Select来进行调度
 
 > * Select 的使用
 > * 定时器的使用
 > * 在Select中使用 nil Channel
+
+```go
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+// generator 函数创建一个生成整数的生产者。
+// 它每隔一定时间（随机时间）生成一个整数，并通过 channel 返回。
+// 该函数运行在一个 goroutine 中，持续生成数据并发送到 channel 中。
+func generator() chan int {
+	out := make(chan int)
+	go func() {
+		i := 0
+		// 无限循环，持续生成数据
+		for {
+			time.Sleep(time.Duration(rand.Intn(1500)) * time.Millisecond)
+			// 发送数据到 channel
+			out <- i
+			i++ // 每次生成的数据递增
+		}
+	}()
+	return out // 返回生成数据的 channel
+}
+
+// worker 函数代表消费者，每个 worker 从 channel 中接收数据并处理。
+// 每个 worker 在接收到数据后会休眠一秒，然后打印处理的结果。
+func worker(id int, c chan int) {
+	//遍历 Channel，直到 Channel 被关闭。
+	//每次接收一个数据 n，输出到控制台。
+	//range 的作用：优雅地处理 Channel 的关闭，当 Channel 关闭后，循环会自动退出。
+	for n := range c {
+		// 模拟处理数据的时间
+		time.Sleep(time.Second)
+		//n, ok := <-c
+		//if !ok {
+		//	break
+		//}
+		fmt.Printf("Worker %d received %d\n", id, n)
+	}
+}
+
+// createWorker 函数用来创建并启动一个 worker。
+// 每个 worker 都会启动一个 goroutine 去处理从 channel 中接收到的数据。
+// 该函数返回一个 channel 用来接收传入的数据。
+func createWorker(id int) chan<- int {
+	c := make(chan int) //创建一个无缓冲 Channel。
+	go worker(id, c)    //启动 Goroutine，运行 worker 函数，让它监听传入的 Channel。
+	return c
+}
+
+func main() {
+	// 创建两个生产者 generator 函数返回的 channel。
+	var c1, c2 = generator(), generator()
+	// 创建一个 worker 来消费数据
+	var worker = createWorker(0)
+
+	//把生成的数据存起来
+	var values []int
+	// 初始化计数器 n，存储生成的数据
+	n := 0
+
+	// 创建一个定时器，在 10 秒后触发。
+	tm := time.After(10 * time.Second)
+	// 创建一个定时器，每秒触发一次，用来监控队列的长度。
+	tick := time.Tick(time.Second)
+
+	// 无限循环，持续接收生产者的数据并传给消费者，同时处理超时、定时等事件
+	for {
+		var activeWorker chan<- int
+		var activeValue int
+		// 如果队列有数据，就选择第一个数据并传给 worker
+		if len(values) > 0 {
+			activeWorker = worker
+			activeValue = values[0]
+		}
+		select {
+		case n = <-c1: // 如果从 c1 中接收到数据，将其加入队列
+			values = append(values, n)
+		case n = <-c2: // 如果从 c2 中接收到数据，将其加入队列
+			values = append(values, n)
+		case activeWorker <- activeValue: // 将队列中第一个值传给 worker 进行处理
+			values = values[1:] // 处理完一个数据后，移除队列中的第一个值
+
+		// 如果超过 500 毫秒没有接收到任何数据，则打印 "time out"
+		case <-time.After(500 * time.Millisecond):
+			fmt.Println("time out")
+		//通过tick,每秒钟检查一次队列的长度，反映当前的系统状态
+		case <-tick:
+			fmt.Println("queue len =", len(values))
+
+		// 如果 10 秒钟时间到了，就结束程序
+		//总的时间去确定程序的运行时长
+		case <-tm:
+			fmt.Println("bye")
+			return
+
+			//default:
+			//	fmt.Println("No value received")
+		}
+	}
+}
+```
+
+
+
+#### 并发模式
+
+并发编程模式
+
+> * 生成器
+> * 服务/任务
+> * 同时等待多个服务: 两种方法
+
+```go
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+// msgGen() 消息生成器
+func msgGen(name string) chan string {
+	c := make(chan string)
+	go func() {
+		i := 0
+		for {
+			time.Sleep(time.Duration(rand.Intn(2000)) * time.Millisecond)
+			c <- fmt.Sprintf("service %s: message %d", name, i)
+			i++
+		}
+	}()
+	return c
+}
+
+// fanIn 在明确知道参数个数的情况下用,一般大多数情况下是明确知道个数的
+func fanIn(chs ...chan string) chan string {
+	c := make(chan string)
+	for _, ch := range chs {
+		go func() {
+			for {
+				c <- <-ch
+			}
+		}()
+	}
+	return c
+}
+
+// fanInBySelect 在不明确知道参数个数的情况下用
+func fanInBySelect(c1, c2 chan string) chan string {
+	c := make(chan string)
+	go func() {
+		for {
+			select {
+			case m := <-c1:
+				c <- m
+			case m := <-c2:
+				c <- m
+			}
+		}
+	}()
+	return c
+}
+
+func main() {
+	m1 := msgGen("service1") //handle 服务的一个句柄
+	m2 := msgGen("service2")
+	m := fanIn(m1, m2)
+	for {
+		fmt.Println(<-m)
+	}
+}
+```
+
+
+
+#### 并发任务的控制
+
+> * 非阻塞等待
+> * 超时机制
+> * 任务中断/退出
+> * 优雅退出
+
+```go
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+// msgGen() 消息生成器
+func msgGen(name string, done chan struct{}) chan string {
+	c := make(chan string)
+	go func() {
+		i := 0
+		for {
+			select {
+			case <-time.After(time.Duration(rand.Intn(5000)) * time.Millisecond):
+				c <- fmt.Sprintf("service %s: message %d", name, i)
+			case <-done:
+				fmt.Println("cleaning up")
+				time.Sleep(2 * time.Second)
+				fmt.Println("cleaning done")
+				done <- struct{}{}
+				return
+			}
+			i++
+		}
+	}()
+	return c
+}
+
+// fanIn 在明确知道参数个数的情况下用,一般大多数情况下是明确知道个数的
+func fanIn(chs ...chan string) chan string {
+	c := make(chan string)
+	for _, ch := range chs {
+		go func() {
+			for {
+				c <- <-ch
+			}
+		}()
+	}
+	return c
+}
+
+// fanInBySelect 在不明确知道参数个数的情况下用
+func fanInBySelect(c1, c2 chan string) chan string {
+	c := make(chan string)
+	go func() {
+		for {
+			select {
+			case m := <-c1:
+				c <- m
+			case m := <-c2:
+				c <- m
+			}
+		}
+	}()
+	return c
+}
+
+// nonBlockingWait 非阻塞等待
+func nonBlockingWait(c chan string) (string, bool) {
+	select {
+	case m := <-c:
+		return m, true
+	default:
+		return "", false
+	}
+}
+
+// timeoutWait 超时机制
+func timeoutWait(c chan string, timeout time.Duration) (string, bool) {
+	select {
+	case m := <-c:
+		return m, true
+	case <-time.After(timeout):
+		return "", false
+	}
+}
+
+func main() {
+	done := make(chan struct{})
+	m1 := msgGen("service1", done) //handle 服务的一个句柄
+	for i := 0; i < 5; i++ {
+		if m, ok := timeoutWait(m1, time.Second); ok {
+			fmt.Println(m)
+		} else {
+			fmt.Println("timeout")
+		}
+	}
+	done <- struct{}{}
+	<-done
+}
+```
+
+
+
+### 迷宫的广度优先算法
+
+#### 迷宫_算法
+
+广度优先算法
+
+> * 为爬虫实战项目做好准备
+> * 应用广泛,综合性强
+> * 面试常见
+
+<img src= "image-11.png" alt="Goroutine" style="zoom:50%;">
+
+<img src= "image-12.png" alt="Goroutine" style="zoom:50%;">
+
+#### 迷宫代码实现
+
+广度优先搜索走迷宫
+
+> * 用循环创建二维slice
+> * 使用slice来实现队列
+> * 用Fscanf读取文件(改用更鲁棒的数据读取方法)
+> * 对Point的抽象
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+// readMaze 读取迷宫数据
+func readMaze(filename string) [][]int {
+	// 打开文件
+	file, err := os.Open(filename)
+	if err != nil {
+		panic(err) // 如果文件无法打开,则退出程序
+	}
+
+	// 使用 bufio.Scanner 逐行读取文件内容
+	//scanner.Scan()：调用这个方法时，bufio.Scanner 会从输入文件中读取下一行的内容，直到遇到换行符（\n）为止。
+	//如果文件的第一行是 6 5，scanner.Scan() 就会将 6 5 这一行读取到内部缓冲中。
+	scanner := bufio.NewScanner(file)
+	scanner.Scan()                           // 读取第一行
+	header := strings.Fields(scanner.Text()) // 分割行内容
+	row, _ := strconv.Atoi(header[0])        // 提取行数
+	col, _ := strconv.Atoi(header[1])        // 提取列数
+
+	// 初始化二维数组来存储迷宫
+	// make 函数用于创建切片、映射（map）和通道（channel）。它接受三个参数：类型、长度和容量（可选）。
+	maze := make([][]int, row)
+	for i := 0; i < row; i++ {
+		scanner.Scan()                         // 读取每一行
+		line := strings.Fields(scanner.Text()) // 分割行内容为字符串数组
+		maze[i] = make([]int, col)             // 将 maze 中的每一行初始化为一个切片，确保每一行有 col 列，并且所有的值是 0（默认值）
+		for j := 0; j < col; j++ {
+			maze[i][j], _ = strconv.Atoi(line[j]) // 转换为整数
+		}
+	}
+	return maze // 返回二维数组
+}
+
+// 定义点结构体, 表示二维坐标
+type point struct {
+	i, j int // i 表示行索引，j 表示列索引
+}
+
+// 定义方向数组,表示上左下右四个移动方向
+var dirs = [4]point{
+	{-1, 0}, {0, -1}, {1, 0}, {0, 1}, // 上、左、下、右
+}
+
+// `add` 方法用于将当前点和另一个点的坐标相加，返回新点
+func (p point) add(r point) point {
+	return point{p.i + r.i, p.j + r.j}
+}
+
+// `at` 方法检查某点是否在二维数组范围内，并返回该点的值
+func (p point) at(grid [][]int) (int, bool) {
+	if p.i < 0 || p.i >= len(grid) { // 检查行是否越界
+		return 0, false
+	}
+
+	if p.j < 0 || p.j >= len(grid[p.i]) { // 检查列是否越界
+		return 0, false
+	}
+	return grid[p.i][p.j], true // 返回点值和有效性
+}
+
+// 广度优先搜索算法，计算从起点到终点的最短路径步数
+func walk(maze [][]int, start, end point) [][]int {
+	// 初始化步数数组，记录从起点到每个点的步数
+	steps := make([][]int, len(maze))
+	for i := range steps {
+		steps[i] = make([]int, len(maze[i])) // 每行分配内存
+	}
+
+	// BFS 队列，初始只包含起点
+	Q := []point{start}
+
+	// BFS 主循环
+	for len(Q) > 0 {
+		cur := Q[0] // 获取队列中的第一个点
+		Q = Q[1:]   // 将该点从队列中移除
+
+		// 发现终点,退出程序
+		if cur == end {
+			break
+		}
+
+		// 遍历四个方向
+		for _, dir := range dirs {
+			next := cur.add(dir) //计算移动后的新点
+
+			// maze at next is 0
+			// and steps at next is 0
+			// and next != start
+			// 检查新点是否在迷宫范围内且不是障碍物
+			val, ok := next.at(maze)
+			if !ok || val == 1 {
+				continue
+			}
+
+			// 检查新点是否已经被访问过
+			val, ok = next.at(steps)
+			if !ok || val != 0 {
+				continue
+			}
+
+			// 起点本身不能作为下一个点
+			if next == start {
+				continue
+			}
+
+			// 当前点的步数加一，记录到新点
+			curSteps, _ := cur.at(steps)
+			steps[next.i][next.j] = curSteps + 1
+
+			// 将新点加入队列
+			Q = append(Q, next)
+		}
+	}
+
+	return steps
+}
+
+func main() {
+	maze := readMaze("maze/maze.in")
+
+	//for _, row := range maze {
+	//	for _, val := range row {
+	//		fmt.Printf("%d ", val)
+	//	}
+	//	fmt.Println()
+	//}
+
+	steps := walk(maze, point{0, 0}, point{len(maze) - 1, len(maze[0]) - 1})
+
+	for _, row := range steps {
+		for _, val := range row {
+			fmt.Printf("%3d", val)
+		}
+		fmt.Println()
+	}
+}
+```
+
+
+
+### http及其它标准库
+
+#### http标准库
+
+http
+
+1. 起服务器:
+
+```go
+func HelloServer(w http.ResponseWriter, req *http.Request) {
+    io.WriteString(w, "hello, world!\n")
+}
+
+func main() {
+    http.HandleFunc("/hello", HelloServer)
+    log.Fatal(http.ListenAndServe(":12345", nil))
+}
+```
+
+2. 客户端角度:
+
+   > * 使用http客户端发送请求
+   > * 使用http.Client,  http.Request控制请求头部,控制客户端重定向行为等
+   > * 使用httputil简化工作
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"net/http/httputil"
+)
+
+func main() {
+	request, err := http.NewRequest(http.MethodGet, "http://www.baidu.com", nil)
+	request.Header.Add("user-agent",
+		"Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1 Edg/131.0.0.0")
+
+	client := http.Client{
+		CheckRedirect: func(
+			req *http.Request,
+			via []*http.Request) error {
+			fmt.Println("Redirected to ", req)
+			return nil
+		},
+	}
+	resp, err := client.Do(request)
+	//resp, err := http.Get("http://www.baidu.com")
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+    // 使用了DumpResponse工具
+	s, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%s\n", s)
+}
+```
+
+
+
+http服务器的性能分析
+
+> * import_ "net/http/pprof"
+> * 访问/debug/pprof/
+> * 使用go tool pprof 分析性能
+
+#### JSON的解析
+
+* JSON的数据格式
+* 结构体的tag
+* JSON Marshal 与 Unmarshal, 数据类型
+* 第三方API的解析技巧
+
+```go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+type OrderItem struct {
+	ID    string  `json:"id"`
+	Name  string  `json:"name"`
+	Price float64 `json:"price"`
+}
+
+type Order struct { //tag
+	ID         string `json:"id"`
+	Items      []OrderItem
+	TotalPrice float64 `json:"total_price"`
+}
+
+func main() {
+	parseNLP()
+}
+
+// Marshal
+func marshal() {
+	o := Order{
+		ID:         "1234",
+		TotalPrice: 20,
+		Items: []OrderItem{
+			{
+				ID:    "item_1",
+				Name:  "learn go",
+				Price: 15,
+			},
+			{
+				ID:    "item_2",
+				Name:  "interview",
+				Price: 10,
+			},
+		},
+	}
+
+	b, err := json.Marshal(o)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("%s\n", b)
+	//fmt.Printf("%+v\n", o)
+}
+
+// unmarshal
+func unmarshal() {
+	s := `{"id":"1234","Items":[{"id":"item_1","name":"learn go","price":15},{"id":"item_2","name":"interview","price":10}],"total_price":20}`
+	var o Order
+	err := json.Unmarshal([]byte(s), &o)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%+v\n", o)
+}
+
+// 第三方API的解析技巧
+func parseNLP() {
+	res := `{
+  "result": [
+    {
+      "synonym": "",
+      "weight": "0.100000",
+      "tag": "普通词",
+      "word": "请"
+    },
+    {
+      "synonym": "",
+      "weight": "0.100000",
+      "tag": "普通词",
+      "word": "输入"
+    },
+    {
+      "synonym": "双手合十",
+      "weight": "1.000000",
+      "tag": "品类",
+      "word": "文本"
+    }
+  ]
+}`
+	m := struct {
+		Result []struct {
+			Synonym string `json:"synonym"`
+			Tag     string `json:"tag"`
+		} `json:"result"`
+	}{}
+	err := json.Unmarshal([]byte(res), &m)
+	if err != err {
+		panic(err)
+	}
+
+	fmt.Printf("%+v,\n %+v,", m.Result[2].Synonym, m.Result[2].Tag)
+}
+```
+
+
+
+#### 第三方http框架介绍
+
+> * gin-gonic/gin
+> * middleware的使用
+> * context的使用
+
